@@ -1,6 +1,8 @@
 ﻿-- робимо таблиці
 -- CREATE DATABASE PA01;
 -- Дані в таблицях були згенеровані завдяки сервісу  https://fabricate.tonic.ai/
+
+-- створюємо таблицю абонементів
 CREATE TABLE membership_plans
 (
     plan_id         SERIAL PRIMARY KEY,
@@ -11,6 +13,7 @@ CREATE TABLE membership_plans
     created_at      TIMESTAMP
 );
 
+--створюємо таблицю в якій будуть лежати тренера
 CREATE TABLE trainers
 (
     trainer_id SERIAL PRIMARY KEY,
@@ -22,6 +25,7 @@ CREATE TABLE trainers
     hire_date  DATE
 );
 
+-- робмо таблицю клієнтів
 CREATE TABLE members
 (
     member_id     SERIAL PRIMARY KEY,
@@ -38,6 +42,7 @@ CREATE TABLE members
     join_date     DATE
 );
 
+-- робимо таблицю розкладу всяких занять
 CREATE TABLE classes
 (
     class_id         SERIAL PRIMARY KEY,
@@ -49,6 +54,7 @@ CREATE TABLE classes
     duration_minutes INT
 );
 
+-- створюємо таблицю з бронюваннями через яку будемо зв'язувати інші табоиці
 CREATE TABLE bookings
 (
     booking_id   SERIAL PRIMARY KEY,
@@ -60,22 +66,47 @@ CREATE TABLE bookings
 );
 
 SELECT COUNT(*)
-FROM bookings; -- перевірив чи правильно імпортував файл
+FROM bookings;
+
+--explain analyze
+--Planning Time: 0.679 ms
+--Execution Time: 0.838 ms
+
 SELECT
 --         bookings.booking_id,
 --        members.first_name,
 --        members.last_name,
 --        classes.class_name,
 --        classes.trainer_id,
---        trainers.trainer_id, вирішив групнути за тренерськими фаміліями та іменами
+--        trainers.trainer_id, в ході розмислення вирішив групнути за тренерськими фаміліями та іменами,спочатку виводило ці дані
+trainers.first_name,
+trainers.last_name,
+COUNT(bookings.booking_id) AS total_visited_classes
+FROM bookings -- joinнимо таблиці іннер джоіном
+    -- так як я вирішив рахувати саме атендед заняття то беремо дані з букінгу, це така таблиця в якій є майже всі спільні дані
+         JOIN members ON bookings.member_id = members.member_id
+    -- буукінг і мембери повязані за мембер айді
+         JOIN classes ON bookings.class_id = classes.class_id
+    -- по клас айді пов'язані
+         JOIN trainers ON classes.trainer_id = trainers.trainer_id
+    -- по трейнер айді  але тут беремо не з букінгу, а з таблиці занять щоб подивитись який саме тренер веде яке завдання
+    -- також завдяки цьому можна буде зробити груп бай
+         JOIN membership_plans ON members.plan_id = membership_plans.plan_id
+    -- ну тут до таблиці клієнтів під'єднуємо мемберщіп плани
+WHERE bookings.attended = true --   вирішив виводити лише ті записи,які відвідали
+GROUP BY trainers.last_name, trainers.first_name --групаєм за імя фамілія
+ORDER BY total_visited_classes DESC; -- сортуємо тренерів за к-стю виконаних занять
+
+-- чистий селект без коментарів
+SELECT
 trainers.first_name,
 trainers.last_name,
 COUNT(bookings.booking_id) AS total_visited_classes
 FROM bookings
-         JOIN members ON bookings.member_id = members.member_id
+    JOIN members ON bookings.member_id = members.member_id
          JOIN classes ON bookings.class_id = classes.class_id
          JOIN trainers ON classes.trainer_id = trainers.trainer_id
          JOIN membership_plans ON members.plan_id = membership_plans.plan_id
-WHERE bookings.attended = true -- 200 людей не відвідало
+WHERE bookings.attended = true
 GROUP BY trainers.last_name, trainers.first_name
 ORDER BY total_visited_classes DESC;
